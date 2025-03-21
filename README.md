@@ -4,7 +4,10 @@ RAWデータをローカルバックアップし、さらにS3 Glacier Deep Arch
 
 採用フラグまたはレーティング☆1以上が対象になります。
 
+Lightroom Classicでつけた採用フラグとレーティングで動作確認しています。
+
 ## 準備
+- 現像ソフトでxmpファイルを作る設定にしておく
 - `brew install exiftool`
 - `brew install awscli`
 - S3にバケットを作っておく
