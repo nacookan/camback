@@ -10,6 +10,10 @@ ENV["AWS_CONFIG_FILE"]             = File.join(project_aws_dir, "config")
 puts
 puts "cloudup begin #{Time.now}"
 
+# clean local .DS_Store
+system("find \"#{BACKUP_DIR}\" -name '.DS_Store' -type f -ls -delete")
+
+# upload
 cmd = "aws s3 sync \"#{BACKUP_DIR}\" \"#{S3_BUCKET}\" --storage-class DEEP_ARCHIVE --region us-east-1 --exact-timestamps --delete"
 puts cmd
 system(cmd)
