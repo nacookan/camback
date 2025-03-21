@@ -13,7 +13,6 @@ extensions = %w[
 ]
 
 puts
-puts "Camback - Up your moments."
 puts "backup begin #{Time.now}"
 
 # 前回チェック
