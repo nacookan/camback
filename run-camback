@@ -1,0 +1,15 @@
+#!/bin/bash
+
+echo
+echo "Camback - Up your moments."
+echo "Version 1"
+
+while true; do
+  ./backup
+  ./cleanup
+  ./cloudup
+
+  echo
+  echo "sleep started: $(date)" 
+  sleep 3600
+done

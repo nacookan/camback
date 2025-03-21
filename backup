@@ -1,0 +1,145 @@
+#!/usr/bin/env ruby
+require 'open3'
+require 'time'
+require 'fileutils'
+require_relative "config"
+
+# 対象の拡張子
+# 参考: https://helpx.adobe.com/jp/camera-raw/kb/camera-raw-plug-supported-cameras.html
+# RAWだけじゃなく jpg/jpeg tif/tiff heic/heif も追加
+extensions = %w[
+  FFF 3FR ARW CR2 CR3 CRW DCR DNG ERF GPR IIQ KDC MEF MFW MOS MRW NEF NEFX NRW ORF
+  PEF RAF RW2 RWL RAW SRF SRW X3F JPG JPEG TIF TIFF HEIC HEIF
+]
+
+puts
+puts "Camback - Up your moments."
+puts "backup begin #{Time.now}"
+
+# 前回チェック
+LAST_CHECK_FILE = "#{SOURCE_DIR}/last_cambackup.txt"
+last_check_time = if File.exist?(LAST_CHECK_FILE)
+                    Time.parse(File.read(LAST_CHECK_FILE).strip)
+                  else
+                    Time.at(0)
+                  end
+puts "last cambackup: #{last_check_time}"
+
+files_count = 0
+
+Dir.glob("#{SOURCE_DIR}/**/*.{#{extensions.join(',')}}", File::FNM_CASEFOLD).sort.each do |file|
+  files_count += 1
+  puts ">>> [#{files_count}] " + Time.now.strftime("%Y-%m-%d %H:%M:%S.%L") + " >>>"
+  puts "check: #{file}"
+
+  # 元ファイルのタイムスタンプ
+  file_mtime = File.mtime(file)
+  # 対応するXMP
+  xmp_file = file.sub(/\.[^.]+$/, ".xmp")
+  xmp_exist = File.exist?(xmp_file)
+  xmp_mtime = xmp_exist ? File.mtime(xmp_file) : Time.at(0)
+
+  # 前回チェックよりも新しい場合のみ処理
+  if file_mtime <= last_check_time && xmp_mtime <= last_check_time
+    puts "skip: #{file} (not modified)"
+    next
+  end
+
+  # RatingとPickを取得
+  rating = nil
+  pick   = nil
+
+  # XMPをgrepしてみる
+  if xmp_exist
+    puts "xmp: #{xmp_file}"
+
+    # "xmp:Rating"と"xmpDM:pick"を取得
+    rating_output = `grep -o 'xmp:Rating="[^"]\\+"' "#{xmp_file}"`.chomp
+    pick_output   = `grep -o 'xmpDM:pick="[^"]\\+"' "#{xmp_file}"`.chomp
+
+    if rating_output =~ /xmp:Rating="(\d+)"/i
+      rating = $1.to_i
+    end
+    if pick_output =~ /xmpDM:pick="(\d+)"/i
+      pick = $1.to_i
+    end
+  end
+
+  # XMPから取得できなかったらexiftoolを使う
+  if rating.nil? || pick.nil?
+    puts "exiftool: #{file}"
+
+    # exiftool
+    exif_cmd = "exiftool -a -s \"#{file}\""
+    exif_output, _ = Open3.capture2(exif_cmd)
+    exif_output = exif_output.encode("UTF-8", "binary", invalid: :replace, undef: :replace, replace: "")
+
+    rating_values = []
+    pick_values   = []
+
+    # 結果を確認
+    exif_output.each_line do |line|
+      # Rating
+      if line =~ /^(?:\S+:)?Rating\s*:\s*(\d+)/
+        rating_values << $1.to_i
+      end
+      # Pick
+      if line =~ /^(?:\S+:)?Pick\s*:\s*(\d+)/
+        pick_values << $1.to_i
+      end
+    end
+
+    max_rating = rating_values.empty? ? 0 : rating_values.max
+    max_pick   = pick_values.empty?   ? 0 : pick_values.max
+
+    rating ||= max_rating
+    pick   ||= max_pick
+  end
+
+  # ここまででnilだったら0にしておく
+  rating ||= 0
+  pick   ||= 0
+
+  # Ratingが1以上かPickが1ならバックアップ対象？
+  is_target = (rating >= 1) || (pick == 1)
+  puts "judge: #{file} -> #{is_target} (Rating: #{rating}, Pick: #{pick})"
+
+  # バックアップ先のパスを生成
+  rel_path    = file.sub(/^#{Regexp.escape(SOURCE_DIR)}/, '')
+  backup_file = File.join(BACKUP_DIR, rel_path)
+  backup_xmp  = backup_file.sub(/\.[^.]+$/, ".xmp")
+
+  if is_target
+    # バックアップ先が無ければ作成
+    dest_dir = File.dirname(backup_file)
+    FileUtils.mkdir_p(dest_dir) unless Dir.exist?(dest_dir)
+    
+    # rsync (すでにあったら上書きされる)
+    puts "backup: #{backup_file}"
+    system("rsync -av \"#{file}\" \"#{backup_file}\"")
+    if xmp_exist
+      # XMPもrsync
+      dest_dir_xmp = File.dirname(backup_xmp)
+      FileUtils.mkdir_p(dest_dir_xmp) unless Dir.exist?(dest_dir_xmp)
+      puts "backup: #{backup_xmp}"
+      system("rsync -av \"#{xmp_file}\" \"#{backup_xmp}\"")
+    end
+  else
+    # バックアップ対象外の場合、不要なら削除
+    if File.exist?(backup_file)
+      puts "delete: #{backup_file}"
+      system("rm -v \"#{backup_file}\"")
+    end
+    if File.exist?(backup_xmp)
+      puts "delete: #{backup_xmp}"
+      system("rm -v \"#{backup_xmp}\"")
+    end
+  end
+  puts "<<< [#{files_count}] " + Time.now.strftime("%Y-%m-%d %H:%M:%S.%L") + " <<<"
+end
+
+# 次回のために現在時刻を書き出す
+current_time = Time.now
+File.open(LAST_CHECK_FILE, "w") { |f| f.puts current_time.iso8601 }
+puts "last cambackup updated: #{current_time}"
+puts "backup end #{Time.now}"

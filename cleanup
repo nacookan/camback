@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+require 'fileutils'
+require_relative "config"
+
+puts
+puts "cleanup begin #{Time.now}"
+
+Dir.glob("#{BACKUP_DIR}/**/*", File::FNM_CASEFOLD).sort.each do |backup_file|
+  # ディレクトリは除外
+  next if File.directory?(backup_file)
+  
+  # 元ファイルのパスを生成
+  relative_path = backup_file.sub(/^#{Regexp.escape(BACKUP_DIR)}/, '')
+  source_file = File.join(SOURCE_DIR, relative_path)
+  
+  # 元ファイルが存在しなければ、バックアップを削除
+  unless File.exist?(source_file)
+    puts "delete: #{backup_file} (source deleted)"
+    FileUtils.rm(backup_file)
+  end
+end
+
+puts "cleanup end #{Time.now}"

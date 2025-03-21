@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+require 'open3'
+require 'time'
+require_relative "config"
+
+project_aws_dir = File.expand_path(File.join(__dir__, ".aws"))
+ENV["AWS_SHARED_CREDENTIALS_FILE"] = File.join(project_aws_dir, "credentials")
+ENV["AWS_CONFIG_FILE"]             = File.join(project_aws_dir, "config")
+
+puts
+puts "cloudup begin #{Time.now}"
+
+cmd = "aws s3 sync \"#{BACKUP_DIR}\" \"#{S3_BUCKET}\" --storage-class DEEP_ARCHIVE --region us-east-1 --exact-timestamps --delete"
+puts cmd
+system(cmd)
+
+if $?.success?
+  puts "OK: cloudup completed"
+else
+  abort "ERROR: cloudup failed"
+end
+puts "cloudup end #{Time.now}"
