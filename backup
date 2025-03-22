@@ -28,8 +28,8 @@ files_count = 0
 
 Dir.glob("#{SOURCE_DIR}/**/*.{#{extensions.join(',')}}", File::FNM_CASEFOLD).sort.each do |file|
   files_count += 1
-  puts ">>> [#{files_count}] " + Time.now.strftime("%Y-%m-%d %H:%M:%S.%L") + " >>>"
-  puts "check: #{file}"
+  #puts ">>> [#{files_count}] " + Time.now.strftime("%Y-%m-%d %H:%M:%S.%L") + " >>>"
+  #puts "check: #{file}"
 
   # 元ファイルのタイムスタンプ
   file_mtime = File.mtime(file)
@@ -40,7 +40,7 @@ Dir.glob("#{SOURCE_DIR}/**/*.{#{extensions.join(',')}}", File::FNM_CASEFOLD).sor
 
   # 前回チェックよりも新しい場合のみ処理
   if file_mtime <= last_check_time && xmp_mtime <= last_check_time
-    puts "skip: #{file} (not modified)"
+    #puts "skip: #{file} (not modified)"
     next
   end
 
@@ -50,7 +50,7 @@ Dir.glob("#{SOURCE_DIR}/**/*.{#{extensions.join(',')}}", File::FNM_CASEFOLD).sor
 
   # XMPをgrepしてみる
   if xmp_exist
-    puts "xmp: #{xmp_file}"
+    #puts "xmp: #{xmp_file}"
 
     # "xmp:Rating"と"xmpDM:pick"を取得
     rating_output = `grep -o 'xmp:Rating="[^"]\\+"' "#{xmp_file}"`.chomp
@@ -66,7 +66,7 @@ Dir.glob("#{SOURCE_DIR}/**/*.{#{extensions.join(',')}}", File::FNM_CASEFOLD).sor
 
   # XMPから取得できなかったらexiftoolを使う
   if rating.nil? || pick.nil?
-    puts "exiftool: #{file}"
+    #puts "exiftool: #{file}"
 
     # exiftool
     exif_cmd = "exiftool -a -s \"#{file}\""
@@ -101,7 +101,7 @@ Dir.glob("#{SOURCE_DIR}/**/*.{#{extensions.join(',')}}", File::FNM_CASEFOLD).sor
 
   # Ratingが1以上かPickが1ならバックアップ対象？
   is_target = (rating >= 1) || (pick == 1)
-  puts "judge: #{file} -> #{is_target} (Rating: #{rating}, Pick: #{pick})"
+  #puts "judge: #{file} -> #{is_target} (Rating: #{rating}, Pick: #{pick})"
 
   # バックアップ先のパスを生成
   rel_path    = file.sub(/^#{Regexp.escape(SOURCE_DIR)}/, '')
@@ -111,6 +111,7 @@ Dir.glob("#{SOURCE_DIR}/**/*.{#{extensions.join(',')}}", File::FNM_CASEFOLD).sor
   if is_target
     # バックアップ先が無ければ作成
     dest_dir = File.dirname(backup_file)
+    puts "mkdir: #{dest_dir}"
     FileUtils.mkdir_p(dest_dir) unless Dir.exist?(dest_dir)
     
     # rsync (すでにあったら上書きされる)
@@ -134,7 +135,7 @@ Dir.glob("#{SOURCE_DIR}/**/*.{#{extensions.join(',')}}", File::FNM_CASEFOLD).sor
       system("rm -v \"#{backup_xmp}\"")
     end
   end
-  puts "<<< [#{files_count}] " + Time.now.strftime("%Y-%m-%d %H:%M:%S.%L") + " <<<"
+  #puts "<<< [#{files_count}] " + Time.now.strftime("%Y-%m-%d %H:%M:%S.%L") + " <<<"
 end
 
 # 次回のために現在時刻を書き出す
